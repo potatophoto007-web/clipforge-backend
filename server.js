@@ -108,7 +108,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Returns all sheet tab names — use this to find the correct sheet name
 app.get('/api/sheet-info', async (req, res) => {
   try {
     const { sheets } = getSheetsClient();
@@ -140,7 +139,7 @@ app.get('/api/sheet-info', async (req, res) => {
 
 app.get('/api/projects', async (req, res) => {
   try {
-    const values = await fetchSheet('Projects!A1:Z1000');
+    const values = await fetchSheet('ชีต1!A1:Z1000');
     const data   = rowsToObjects(values);
     console.log(`[projects] OK — ${data.length} rows, headers: ${values[0]?.join(', ')}`);
     res.json(data);
@@ -164,7 +163,6 @@ app.get('/api/leads', async (req, res) => {
   }
 });
 
-// ── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`ClipForge Backend → http://localhost:${PORT}`);
