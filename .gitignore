@@ -1,0 +1,6 @@
+@'
+node_modules/
+.env
+civil-decoder-500118-h9-4c9e33ad0ccd.json
+.DS_Store
+'@ | Out-File -Encoding UTF8 .gitignore
