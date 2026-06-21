@@ -33,35 +33,37 @@ function getAuth() {
 
 // ── Error classification ─────────────────────────────────────────────────────
 function classifySheetError(err) {
-  const status = err.code || err.status;
-  const msg    = err.message || '';
+  const status  = err.code || err.status;
+  const msg     = err.message || '';
+  const details = err.errors?.[0]?.message || msg;
 
   if (status === 403) {
-    if (msg.includes('disabled') || msg.includes('SERVICE_DISABLED')) {
-      return '403 — Google Sheets API not enabled. Go to console.cloud.google.com → APIs → enable "Google Sheets API"';
+    if (details.includes('disabled') || details.includes('SERVICE_DISABLED')) {
+      return '403 SERVICE_DISABLED — Enable "Google Sheets API" at console.cloud.google.com/apis';
     }
-    let email = 'check GOOGLE_CREDENTIALS';
+    let email = 'unknown';
     try { email = JSON.parse(process.env.GOOGLE_CREDENTIALS).client_email; } catch {}
-    return `403 — Permission denied. Share the Google Sheet (Viewer) with: ${email}`;
+    return `403 PERMISSION_DENIED — Share the Sheet (Viewer) with service account: ${email}`;
   }
-  if (status === 404) return '404 — Sheet not found. Verify GOOGLE_SHEET_ID and tab names (Projects / Leads)';
-  if (status === 401) return '401 — Auth failed. GOOGLE_CREDENTIALS may be malformed or private_key is wrong';
-  if (status === 400) return `400 — Bad request: ${msg}`;
-  return `Error (${status ?? 'unknown'}): ${msg}`;
+  if (status === 404) return `404 NOT_FOUND — Wrong GOOGLE_SHEET_ID or sheet tab name. Raw: ${details}`;
+  if (status === 401) return `401 UNAUTHENTICATED — private_key malformed or expired. Raw: ${details}`;
+  if (status === 400) return `400 BAD_REQUEST — ${details}`;
+  return `Error ${status ?? 'unknown'}: ${details}`;
 }
 
-// ── Sheets fetch ─────────────────────────────────────────────────────────────
-async function fetchSheet(range) {
+// ── Sheets helpers ───────────────────────────────────────────────────────────
+function getSheetsClient() {
   if (!SHEET_ID) throw new Error('GOOGLE_SHEET_ID env var is not set');
+  const auth = getAuth();
+  return { sheets: google.sheets({ version: 'v4', auth }), auth };
+}
 
-  const auth   = getAuth();
-  const sheets = google.sheets({ version: 'v4', auth });
-
+async function fetchSheet(range) {
+  const { sheets } = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range,
   });
-
   return res.data.values || [];
 }
 
@@ -86,11 +88,9 @@ app.get('/api/health', (req, res) => {
   try {
     const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS || '');
     credsStatus = '✓ valid JSON';
-    emailStatus = creds.client_email
-      ? `✓ ${creds.client_email}`
-      : '✗ missing client_email';
-    keyStatus = creds.private_key
-      ? `✓ ${creds.private_key.length} chars — starts correctly: ${creds.private_key.startsWith('-----BEGIN') ? 'yes' : 'NO'}`
+    emailStatus = creds.client_email ? `✓ ${creds.client_email}` : '✗ missing client_email';
+    keyStatus   = creds.private_key
+      ? `✓ ${creds.private_key.length} chars, begins correctly: ${creds.private_key.startsWith('-----BEGIN') ? 'yes' : 'NO'}`
       : '✗ missing private_key';
   } catch {
     credsStatus = '✗ invalid JSON or not set';
@@ -108,15 +108,45 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Returns all sheet tab names — use this to find the correct sheet name
+app.get('/api/sheet-info', async (req, res) => {
+  try {
+    const { sheets } = getSheetsClient();
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+      fields: 'spreadsheetId,properties.title,sheets.properties',
+    });
+
+    const tabs = (meta.data.sheets || []).map(s => ({
+      id:    s.properties.sheetId,
+      title: s.properties.title,
+      index: s.properties.index,
+      rows:  s.properties.gridProperties?.rowCount,
+      cols:  s.properties.gridProperties?.columnCount,
+    }));
+
+    console.log('[sheet-info] tabs:', tabs.map(t => t.title).join(', '));
+    res.json({
+      spreadsheet_id:    meta.data.spreadsheetId,
+      spreadsheet_title: meta.data.properties?.title,
+      tabs,
+    });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[sheet-info]', reason, '|', err.message);
+    res.status(500).json({ error: reason, detail: err.message });
+  }
+});
+
 app.get('/api/projects', async (req, res) => {
   try {
     const values = await fetchSheet('Projects!A1:Z1000');
     const data   = rowsToObjects(values);
-    console.log(`[projects] OK — ${data.length} rows`);
+    console.log(`[projects] OK — ${data.length} rows, headers: ${values[0]?.join(', ')}`);
     res.json(data);
   } catch (err) {
     const reason = classifySheetError(err);
-    console.error('[projects]', reason);
+    console.error('[projects]', reason, '|', err.message);
     res.status(500).json({ error: reason, detail: err.message });
   }
 });
@@ -125,11 +155,11 @@ app.get('/api/leads', async (req, res) => {
   try {
     const values = await fetchSheet('Leads!A1:Z1000');
     const data   = rowsToObjects(values);
-    console.log(`[leads] OK — ${data.length} rows`);
+    console.log(`[leads] OK — ${data.length} rows, headers: ${values[0]?.join(', ')}`);
     res.json(data);
   } catch (err) {
     const reason = classifySheetError(err);
-    console.error('[leads]', reason);
+    console.error('[leads]', reason, '|', err.message);
     res.status(500).json({ error: reason, detail: err.message });
   }
 });
