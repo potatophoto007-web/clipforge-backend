@@ -110,7 +110,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/projects', async (req, res) => {
   try {
-    const values = await fetchSheet('Projects!A:J');
+    const values = await fetchSheet('Projects!A1:Z1000');
     const data   = rowsToObjects(values);
     console.log(`[projects] OK — ${data.length} rows`);
     res.json(data);
@@ -123,7 +123,7 @@ app.get('/api/projects', async (req, res) => {
 
 app.get('/api/leads', async (req, res) => {
   try {
-    const values = await fetchSheet('Leads!A:J');
+    const values = await fetchSheet('Leads!A1:Z1000');
     const data   = rowsToObjects(values);
     console.log(`[leads] OK — ${data.length} rows`);
     res.json(data);
