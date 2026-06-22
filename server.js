@@ -161,6 +161,12 @@ app.get('/api/leads', async (req, res) => {
     console.log(`[leads] OK — ${data.length} rows, headers: ${values[0]?.join(', ')}`);
     res.json(data);
   } catch (err) {
+    // Tab doesn't exist yet → return empty array instead of 500
+    const msg = err.message || '';
+    if (err.code === 400 || msg.includes('Unable to parse range') || msg.includes('badRequest')) {
+      console.warn('[leads] tab not found — returning []');
+      return res.json([]);
+    }
     const reason = classifySheetError(err);
     console.error('[leads]', reason, '|', err.message);
     res.status(500).json({ error: reason, detail: err.message });

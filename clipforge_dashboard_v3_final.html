@@ -437,10 +437,10 @@ const clients = [
 /* ===== NORMALIZERS ===== */
 function normalizeProject(p) {
   return {
-    id: p.id || p._id || '',
-    name: p.name || p.project_name || p.title || '(Untitled)',
+    id: p.project_id || p.id || p._id || '',
+    name: p.project_name || p.name || p.title || p.video_type || '(Untitled)',
     client: p.client || p.client_name || p.company || '',
-    category: p.category || p.type || '',
+    category: p.category || p.video_type || p.type || '',
     status: p.status || 'draft',
     tier: p.tier || 1,
     amount: p.amount || p.price || p.budget || 0,
