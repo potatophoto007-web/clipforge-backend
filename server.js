@@ -163,7 +163,7 @@ app.get('/api/leads', async (req, res) => {
   } catch (err) {
     // Tab doesn't exist yet → return empty array instead of 500
     const msg = err.message || '';
-    if (err.code === 400 || msg.includes('Unable to parse range') || msg.includes('badRequest')) {
+    if (err.code === 400 || err.status === 400 || msg.includes('Unable to parse range') || msg.includes('badRequest')) {
       console.warn('[leads] tab not found — returning []');
       return res.json([]);
     }
