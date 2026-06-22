@@ -452,15 +452,15 @@ function normalizeProject(p) {
 
 function normalizeLead(l) {
   return {
-    id: l.id || l._id || '',
+    id: l.lead_id || l.id || l._id || '',
     co: l.co || l.company || l.company_name || l.name || '',
-    cat: l.cat || l.category || l.type || '',
+    cat: l.cat || l.category || l.source || l.type || '',
     contact: l.contact || l.contact_name || l.person || '',
     email: l.email || '',
     phone: l.phone || l.phone_number || '',
     score: l.score || l.lead_score || 0,
     status: l.status || 'sent',
-    last: l.last || l.last_contact || l.last_touched || l.updated_at || 'N/A',
+    last: l.last || l.last_contact || l.last_touched || l.created_date || l.updated_at || 'N/A',
     notes: l.notes || l.note || l.description || '',
   };
 }
