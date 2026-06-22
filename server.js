@@ -103,6 +103,12 @@ function validateEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function makeId(prefix) {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${prefix}${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   let credsStatus = '✗ MISSING';
@@ -423,6 +429,213 @@ app.delete('/api/clients/:client_id', async (req, res) => {
     console.error('[clients DELETE]', reason, '|', err.message);
     res.status(500).json({ error: reason });
   }
+});
+
+// ── Webhook: Lead Intake ──────────────────────────────────────────────────────
+app.post('/webhook/lead-intake', async (req, res) => {
+  const { company_name, contact_name, email, phone, source, budget, deadline, brief } = req.body || {};
+
+  if (!company_name || !contact_name || !email) {
+    return res.status(400).json({ error: 'Missing required fields: company_name, contact_name, email' });
+  }
+  if (!validateEmail(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const lead_id    = makeId('LD');
+  const project_id = makeId('PRJ');
+
+  console.log(`[webhook] intake start | source=${source || 'unknown'} | email=${email}`);
+
+  try {
+    const { sheets } = getSheetsClient();
+
+    // 1. Check for existing client by email (column D)
+    const clientRows = await fetchSheet('Clients!A:D');
+    const existing = clientRows.slice(1).find(r => r[3]?.trim().toLowerCase() === email.toLowerCase());
+    const isNewClient = !existing;
+    const client_id = existing ? existing[0] : makeId('CW');
+
+    if (isNewClient) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SHEET_ID,
+        range: 'Clients!A:J',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [[
+          client_id, company_name.trim(), contact_name.trim(), email.trim(),
+          phone || '', '', '', 'active', '', today,
+        ]] },
+      });
+      console.log(`[webhook] client created: ${client_id} (${company_name})`);
+    } else {
+      console.log(`[webhook] client matched: ${client_id} (existing)`);
+    }
+
+    // 2. Create lead record
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'Leads!A:G',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [[
+        lead_id, company_name.trim(), contact_name.trim(), email.trim(),
+        source || 'webhook', 'new', today,
+      ]] },
+    });
+    console.log(`[webhook] lead created: ${lead_id}`);
+
+    // 3. Auto-create project from lead
+    const videoType = brief ? brief.substring(0, 80) : 'TBD — from lead intake';
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'ชีต1!A:F',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [[
+        project_id, client_id, 'Draft', videoType, today, deadline || '',
+      ]] },
+    });
+    console.log(`[webhook] project created: ${project_id}`);
+
+    console.log(`[webhook] done | lead=${lead_id} | client=${client_id} (${isNewClient ? 'new' : 'existing'}) | project=${project_id} | budget=${budget || '—'}`);
+
+    res.json({
+      success: true,
+      lead_id,
+      client_id,
+      project_id,
+      is_new_client: isNewClient,
+      message: `Intake processed. Project ${project_id} created for ${company_name}.`,
+    });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[webhook]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+// ── Form: Lead Intake ─────────────────────────────────────────────────────────
+app.get('/form/lead-intake', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClipForge — ส่ง Brief</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#FAFAF7; --surface:#fff; --border:rgba(0,0,0,0.09); --border-s:rgba(0,0,0,0.18); --text:#1A1A18; --muted:#6B6B66; --dim:#A8A8A2; --accent:#E85D2A; --green:#2D8B6E; --red:#C73E3E; --mono:'JetBrains Mono',monospace; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.06)}
+  .card-head{padding:28px 32px 20px;border-bottom:1px solid var(--border)}
+  .brand{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:0.15em;color:var(--dim);margin-bottom:10px}
+  .title{font-size:24px;font-weight:600;letter-spacing:-0.02em;color:var(--text)}
+  .sub{font-size:13px;color:var(--muted);margin-top:4px}
+  .card-body{padding:24px 32px 28px}
+  .row{margin-bottom:18px}
+  .row.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--dim);margin-bottom:5px}
+  input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border-s);border-radius:6px;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,93,42,0.1)}
+  textarea{resize:vertical;min-height:80px}
+  .req{color:var(--accent)}
+  .btn{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-family:'Inter',system-ui,sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:background .15s;margin-top:4px}
+  .btn:hover{background:#FF7E4D}
+  .btn:disabled{background:var(--dim);cursor:not-allowed}
+  .result{margin-top:16px;padding:14px 16px;border-radius:6px;font-size:13px;display:none}
+  .result.ok{background:rgba(45,139,110,.1);border:1px solid rgba(45,139,110,.2);color:var(--green)}
+  .result.err{background:rgba(199,62,62,.08);border:1px solid rgba(199,62,62,.2);color:var(--red)}
+  .result.show{display:block}
+  .mono{font-family:var(--mono);font-size:12px}
+  @media(max-width:480px){.row.two{grid-template-columns:1fr}.card-head,.card-body{padding:20px}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-head">
+    <div class="brand">ClipForge Studio</div>
+    <div class="title">ส่ง Brief</div>
+    <div class="sub">กรอกข้อมูลเพื่อเริ่มโปรเจกต์ ทีมงานจะติดต่อกลับภายใน 24 ชม.</div>
+  </div>
+  <div class="card-body">
+    <form id="f">
+      <div class="row two">
+        <div>
+          <label>ชื่อบริษัท / แบรนด์ <span class="req">*</span></label>
+          <input name="company_name" placeholder="Beauty Brand Co" required>
+        </div>
+        <div>
+          <label>ชื่อผู้ติดต่อ <span class="req">*</span></label>
+          <input name="contact_name" placeholder="คุณสมชาย" required>
+        </div>
+      </div>
+      <div class="row two">
+        <div>
+          <label>อีเมล <span class="req">*</span></label>
+          <input name="email" type="email" placeholder="contact@brand.com" required>
+        </div>
+        <div>
+          <label>เบอร์โทร</label>
+          <input name="phone" placeholder="+66-8x-xxx-xxxx">
+        </div>
+      </div>
+      <div class="row two">
+        <div>
+          <label>งบประมาณ (บาท)</label>
+          <input name="budget" placeholder="5,000 – 15,000">
+        </div>
+        <div>
+          <label>Deadline</label>
+          <input name="deadline" type="date">
+        </div>
+      </div>
+      <div class="row">
+        <label>Brief / รายละเอียดงาน</label>
+        <textarea name="brief" placeholder="ต้องการทำวิดีโอโฆษณา 30 วินาที สินค้าประเภท..."></textarea>
+      </div>
+      <input type="hidden" name="source" value="form">
+      <button class="btn" type="submit" id="sub">ส่ง Brief →</button>
+      <div class="result" id="res"></div>
+    </form>
+  </div>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('sub');
+  const res = document.getElementById('res');
+  btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+  res.className = 'result'; res.textContent = '';
+
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    const r = await fetch('/webhook/lead-intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      res.className = 'result ok show';
+      res.innerHTML = '<strong>✓ ส่ง Brief สำเร็จ!</strong><br>ทีมงานจะติดต่อกลับภายใน 24 ชม.<br><span class="mono">Project: ' + data.project_id + ' · Lead: ' + data.lead_id + '</span>';
+      e.target.reset();
+    } else {
+      res.className = 'result err show';
+      res.textContent = '✗ ' + (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+    }
+  } catch(err) {
+    res.className = 'result err show';
+    res.textContent = '✗ ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่';
+  } finally {
+    btn.disabled = false; btn.textContent = 'ส่ง Brief →';
+  }
+});
+</script>
+</body>
+</html>`);
 });
 
 const PORT = process.env.PORT || 3000;
