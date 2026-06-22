@@ -175,11 +175,18 @@ app.get('/api/projects', async (req, res) => {
 });
 
 app.post('/api/projects', async (req, res) => {
-  const { project_id, client_name, status, video_type, created_date, due_date } = req.body || {};
-  const missing = validateRequired(req.body || {}, ['project_id', 'client_name', 'video_type']);
+  const { project_id, client_id, status, video_type, created_date, due_date } = req.body || {};
+  const missing = validateRequired(req.body || {}, ['project_id', 'client_id', 'video_type']);
   if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
   try {
+    // Validate client exists in Clients sheet
+    const clientVals = await fetchSheet('Clients!A:A');
+    const clientIds = clientVals.slice(1).map(r => r[0]).filter(Boolean);
+    if (!clientIds.includes(client_id.trim())) {
+      return res.status(400).json({ error: `Client not found: ${client_id}` });
+    }
+
     const { sheets } = getSheetsClient();
     const today = new Date().toISOString().split('T')[0];
     await sheets.spreadsheets.values.append({
@@ -187,9 +194,9 @@ app.post('/api/projects', async (req, res) => {
       range: 'ชีต1!A:F',
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [[project_id.trim(), client_name.trim(), status || 'Draft', video_type.trim(), created_date || today, due_date || '']] },
+      requestBody: { values: [[project_id.trim(), client_id.trim(), status || 'Draft', video_type.trim(), created_date || today, due_date || '']] },
     });
-    console.log(`[projects POST] appended ${project_id}`);
+    console.log(`[projects POST] appended ${project_id} → client ${client_id}`);
     res.json({ success: true, project_id, message: 'Project created' });
   } catch (err) {
     const reason = classifySheetError(err);
@@ -244,7 +251,7 @@ app.get('/api/leads', async (req, res) => {
 
 app.put('/api/projects/:project_id', async (req, res) => {
   const { project_id } = req.params;
-  const { client_name, status, video_type, created_date, due_date } = req.body || {};
+  const { client_id, status, video_type, created_date, due_date } = req.body || {};
   try {
     const rowNum = await findRowById('ชีต1', project_id);
     if (rowNum === -1) return res.status(404).json({ error: `Project ${project_id} not found` });
@@ -254,7 +261,7 @@ app.put('/api/projects/:project_id', async (req, res) => {
     const row = cur.data.values?.[0] || [];
     const updated = [
       project_id,
-      client_name?.trim()  ?? row[1] ?? '',
+      client_id?.trim()    ?? row[1] ?? '',
       status               ?? row[2] ?? 'Draft',
       video_type?.trim()   ?? row[3] ?? '',
       created_date         ?? row[4] ?? '',
@@ -267,7 +274,7 @@ app.put('/api/projects/:project_id', async (req, res) => {
       requestBody: { values: [updated] },
     });
     console.log(`[projects PUT] updated row ${rowNum} for ${project_id}`);
-    res.json({ success: true, updated_fields: { client_name, status, video_type, created_date, due_date } });
+    res.json({ success: true, updated_fields: { client_id, status, video_type, created_date, due_date } });
   } catch (err) {
     const reason = classifySheetError(err);
     console.error('[projects PUT]', reason, '|', err.message);
@@ -296,6 +303,124 @@ app.delete('/api/projects/:project_id', async (req, res) => {
   } catch (err) {
     const reason = classifySheetError(err);
     console.error('[projects DELETE]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+// ── Clients ──────────────────────────────────────────────────────────────────
+app.get('/api/clients', async (req, res) => {
+  try {
+    const values = await fetchSheet('Clients!A1:J1000');
+    const data = rowsToObjects(values).filter(c => c.status?.toLowerCase() !== 'archived');
+    console.log(`[clients GET] ${data.length} rows`);
+    res.json(data);
+  } catch (err) {
+    const msg = err.message || '';
+    if (err.code === 400 || err.status === 400 || msg.includes('Unable to parse range')) {
+      return res.json([]);
+    }
+    const reason = classifySheetError(err);
+    console.error('[clients GET]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+app.post('/api/clients', async (req, res) => {
+  const { client_id, company_name, contact_name, email, phone, address, industry, status, contract_date } = req.body || {};
+  const missing = validateRequired(req.body || {}, ['client_id', 'company_name']);
+  if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+  if (email && !validateEmail(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  try {
+    const { sheets } = getSheetsClient();
+    const today = new Date().toISOString().split('T')[0];
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'Clients!A:J',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [[
+        client_id.trim(), company_name.trim(), contact_name || '', email || '',
+        phone || '', address || '', industry || '', status || 'active',
+        contract_date || '', today,
+      ]] },
+    });
+    console.log(`[clients POST] appended ${client_id}`);
+    res.json({ success: true, client_id, message: 'Client created' });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[clients POST]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+app.put('/api/clients/:client_id', async (req, res) => {
+  const { client_id } = req.params;
+  const { company_name, contact_name, email, phone, address, industry, status, contract_date } = req.body || {};
+  if (email && !validateEmail(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  try {
+    const rowNum = await findRowById('Clients', client_id);
+    if (rowNum === -1) return res.status(404).json({ error: `Client ${client_id} not found` });
+
+    const { sheets } = getSheetsClient();
+    const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `Clients!A${rowNum}:J${rowNum}` });
+    const row = cur.data.values?.[0] || [];
+    const updated = [
+      client_id,
+      company_name?.trim()  ?? row[1] ?? '',
+      contact_name?.trim()  ?? row[2] ?? '',
+      email?.trim()         ?? row[3] ?? '',
+      phone?.trim()         ?? row[4] ?? '',
+      address?.trim()       ?? row[5] ?? '',
+      industry?.trim()      ?? row[6] ?? '',
+      status                ?? row[7] ?? 'active',
+      contract_date         ?? row[8] ?? '',
+      row[9] ?? '',
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `Clients!A${rowNum}:J${rowNum}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [updated] },
+    });
+    console.log(`[clients PUT] updated row ${rowNum} for ${client_id}`);
+    res.json({ success: true, updated_fields: req.body });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[clients PUT]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+app.delete('/api/clients/:client_id', async (req, res) => {
+  const { client_id } = req.params;
+  try {
+    // Block delete if projects still reference this client
+    const projVals = await fetchSheet('ชีต1!A:B');
+    const projCount = projVals.slice(1).filter(r => r[1] === client_id && r[0]).length;
+    if (projCount > 0) {
+      return res.status(400).json({ error: `Cannot delete — ${projCount} project(s) reference this client` });
+    }
+
+    const rowNum = await findRowById('Clients', client_id);
+    if (rowNum === -1) return res.status(404).json({ error: `Client ${client_id} not found` });
+
+    const { sheets } = getSheetsClient();
+    const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `Clients!A${rowNum}:J${rowNum}` });
+    const row = (cur.data.values?.[0] || []).slice();
+    row[7] = 'Archived';
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `Clients!A${rowNum}:J${rowNum}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [row] },
+    });
+    console.log(`[clients DELETE] archived ${client_id}`);
+    res.json({ success: true, deleted_client_id: client_id });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[clients DELETE]', reason, '|', err.message);
     res.status(500).json({ error: reason });
   }
 });

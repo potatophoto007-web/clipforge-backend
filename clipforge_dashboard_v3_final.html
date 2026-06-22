@@ -261,8 +261,25 @@
   .card-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 10px; }
   .btn-danger { color: var(--red); border-color: rgba(199,62,62,0.25); }
   .btn-danger:hover { background: rgba(199,62,62,0.06); border-color: rgba(199,62,62,0.4); }
+  /* ===== CLIENT CARDS ===== */
+  .clients-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .client-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: all 0.15s ease; }
+  .client-card:hover { border-color: var(--border-strong); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+  .client-card-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .client-card-name { font-size: 15px; font-weight: 500; color: var(--text); cursor: pointer; }
+  .client-card-name:hover { color: var(--accent); }
+  .client-badge { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+  .badge-active { background: var(--green-soft); color: var(--green); }
+  .badge-inactive { background: var(--surface-3); color: var(--text-muted); }
+  .client-card-body { padding: 14px 20px; }
+  .client-meta { display: flex; gap: 6px; align-items: baseline; margin-bottom: 5px; font-size: 13px; color: var(--text-muted); }
+  .client-meta .mk { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--text-dim); min-width: 54px; }
+  .client-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 12px; text-align: center; }
+  .client-stat-v { font-size: 20px; font-weight: 500; color: var(--accent); }
+  .client-stat-l { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-top: 2px; }
 
   @media (max-width: 900px) {
+    .clients-grid { grid-template-columns: 1fr; }
     .app { grid-template-columns: 1fr; }
     .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; z-index: 100; transform: translateX(-100%); transition: transform 0.3s ease; }
     .sidebar.open { transform: translateX(0); }
@@ -311,7 +328,7 @@
       <a class="nav-item" data-page="clients">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="8" r="3"/><ellipse cx="16" cy="13" rx="5" ry="4"/><path d="M2 20c1.5-3 4-5 7-5s5.5 2 7 5"/></svg>
         Clients
-        <span class="nav-count">3</span>
+        <span class="nav-count">0</span>
       </a>
     </nav>
 
@@ -415,13 +432,13 @@
     <section class="page" data-page="clients">
       <div class="topbar">
         <div>
-          <h1 class="page-title">Clients<span class="sub">3 active · ฿7,500 total revenue · Month 1</span></h1>
+          <h1 class="page-title">Clients<span class="sub" id="clients-subtitle">Loading…</span></h1>
         </div>
         <div class="topbar-actions">
-          <button class="btn btn-primary">+ Add client</button>
+          <button class="btn btn-primary" onclick="openClientModal()">+ New client</button>
         </div>
       </div>
-      <div id="clients-grid"></div>
+      <div class="clients-grid" id="clients-grid"></div>
     </section>
 
   </main>
@@ -457,9 +474,11 @@
         <div class="form-err" id="e-project_id">Required</div>
       </div>
       <div>
-        <label class="form-label">Client Name *</label>
-        <input class="form-input" id="f-client_name" placeholder="Brand Co">
-        <div class="form-err" id="e-client_name">Required</div>
+        <label class="form-label">Client *</label>
+        <select class="form-input" id="f-client_id">
+          <option value="">— Select Client —</option>
+        </select>
+        <div class="form-err" id="e-client_id">Required</div>
       </div>
     </div>
     <div class="form-row two">
@@ -560,6 +579,75 @@
   </div>
 </div>
 
+<!-- ===== CLIENT MODAL ===== -->
+<div class="modal-backdrop" id="client-modal-backdrop" onclick="closeModal('client')"></div>
+<div class="modal" id="client-modal">
+  <div class="modal-header">
+    <div class="modal-title" id="client-modal-title">New Client</div>
+    <button class="drawer-close" onclick="closeModal('client')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Client ID *</label>
+        <input class="form-input" id="fc-client_id" placeholder="C004">
+        <div class="form-err" id="ec-client_id">Required</div>
+      </div>
+      <div>
+        <label class="form-label">Company Name *</label>
+        <input class="form-input" id="fc-company_name" placeholder="Brand Co Ltd">
+        <div class="form-err" id="ec-company_name">Required</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Contact Name</label>
+        <input class="form-input" id="fc-contact_name" placeholder="คุณสมชาย">
+      </div>
+      <div>
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="fc-email" placeholder="contact@brand.com">
+        <div class="form-err" id="ec-email">Invalid email</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Phone</label>
+        <input class="form-input" id="fc-phone" placeholder="+66-8x-xxx-xxxx">
+      </div>
+      <div>
+        <label class="form-label">Industry</label>
+        <input class="form-input" id="fc-industry" placeholder="Beauty / F&B / Pet">
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Status</label>
+        <select class="form-input" id="fc-status">
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Contract Date</label>
+        <input class="form-input" type="date" id="fc-contract_date">
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Address</label>
+      <input class="form-input" id="fc-address" placeholder="Bangkok, Thailand">
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('client')">Cancel</button>
+    <button class="btn btn-primary" id="client-submit-btn" onclick="submitClientForm()">
+      <span id="client-submit-label">Create Client</span>
+    </button>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
@@ -570,19 +658,30 @@ const BASE_URL = 'https://clipforge-backend-kappa.vercel.app';
 /* ===== STATE ===== */
 let projects = [];
 let leads = [];
-
-const clients = [
-  { id: 'C001', name: 'Mom Co', contact: 'Khun Mom', email: 'mom@herbal.co.th', phone: '+66-81-234-5678', projects: 2, spent: 8000, status: 'active', notes: 'Test client · herbal cosmetics' },
-  { id: 'C002', name: 'GlowUp Skincare', contact: 'Khun Mim', email: 'mim@glow.co.th', phone: '+66-82-345-6789', projects: 1, spent: 5500, status: 'active', notes: 'K-beauty skincare brand' },
-  { id: 'C003', name: 'Furry Friends', contact: 'Admin', email: 'info@pawsome.co', phone: '+66-84-567-8901', projects: 1, spent: 5500, status: 'active', notes: 'Pet product brand' },
-];
+let clients = [];
 
 /* ===== NORMALIZERS ===== */
+function normalizeClient(c) {
+  return {
+    id: c.client_id || c.id || '',
+    company: c.company_name || c.company || c.name || '',
+    contact: c.contact_name || c.contact || '',
+    email: c.email || '',
+    phone: c.phone || '',
+    address: c.address || '',
+    industry: c.industry || '',
+    status: c.status || 'active',
+    contract_date: c.contract_date || '',
+    created_date: c.created_date || '',
+  };
+}
+
 function normalizeProject(p) {
   return {
     id: p.project_id || p.id || p._id || '',
     name: p.project_name || p.name || p.title || p.video_type || '(Untitled)',
-    client: p.client || p.client_name || p.company || '',
+    client_id: p.client_id || p.client || '',
+    client: p.client_id || p.client || p.client_name || p.company || '',
     category: p.category || p.video_type || p.type || '',
     status: p.status || 'draft',
     tier: p.tier || 1,
@@ -612,22 +711,26 @@ function normalizeLead(l) {
 async function loadData() {
   setLoading(true);
   try {
-    const [projectsRes, leadsRes] = await Promise.all([
+    const [projectsRes, leadsRes, clientsRes] = await Promise.all([
       fetch(`${BASE_URL}/api/projects`),
       fetch(`${BASE_URL}/api/leads`),
+      fetch(`${BASE_URL}/api/clients`),
     ]);
 
     if (!projectsRes.ok) throw new Error(`Projects API: ${projectsRes.status}`);
     if (!leadsRes.ok) throw new Error(`Leads API: ${leadsRes.status}`);
 
     const projectsData = await projectsRes.json();
-    const leadsData = await leadsRes.json();
+    const leadsData    = await leadsRes.json();
+    const clientsData  = clientsRes.ok ? await clientsRes.json() : [];
 
     const rawProjects = Array.isArray(projectsData) ? projectsData : (projectsData.data || projectsData.projects || []);
-    const rawLeads = Array.isArray(leadsData) ? leadsData : (leadsData.data || leadsData.leads || []);
+    const rawLeads    = Array.isArray(leadsData)    ? leadsData    : (leadsData.data    || leadsData.leads    || []);
+    const rawClients  = Array.isArray(clientsData)  ? clientsData  : (clientsData.data  || []);
 
+    clients  = rawClients.map(normalizeClient);
     projects = rawProjects.map(normalizeProject);
-    leads = rawLeads.map(normalizeLead);
+    leads    = rawLeads.map(normalizeLead);
 
     renderAll();
     showToast('ข้อมูลโหลดสำเร็จ', 'system');
@@ -653,6 +756,7 @@ function setLoading(on) {
 function renderProjectCard(p) {
   const statusMap = { delivered: 'status-delivered', 'in progress': 'status-progress', qc: 'status-qc', draft: 'status-draft' };
   const statusClass = statusMap[p.status.toLowerCase()] || 'status-draft';
+  const clientName = clients.find(c => c.id === p.client_id)?.company || p.client || '—';
   return `
     <div class="project-card" onclick="openProject('${p.id}')">
       <div class="project-thumb">
@@ -666,7 +770,7 @@ function renderProjectCard(p) {
           <span class="project-status ${statusClass}">${p.status}</span>
         </div>
         <div class="project-name">${p.name}</div>
-        <div class="project-client">${p.client}</div>
+        <div class="project-client">${clientName}</div>
         <div class="project-footer">
           <span><span class="videos-count">${p.videos}</span> videos</span>
           <span><span class="credits">${p.credits}</span> credits</span>
@@ -674,6 +778,34 @@ function renderProjectCard(p) {
         <div class="card-actions" onclick="event.stopPropagation()">
           <button class="btn btn-sm" onclick="openProjectModal('${p.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteProject('${p.id}',event)">Delete</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderClientCard(c) {
+  const projCount = projects.filter(p => p.client_id === c.id).length;
+  const badge = c.status === 'active' ? 'badge-active' : 'badge-inactive';
+  return `
+    <div class="client-card">
+      <div class="client-card-header">
+        <span class="client-card-name" onclick="openClient('${c.id}')">${c.company}</span>
+        <span class="client-badge ${badge}">${c.status}</span>
+      </div>
+      <div class="client-card-body">
+        <div class="client-meta"><span class="mk">Contact</span>${c.contact || '—'}</div>
+        <div class="client-meta"><span class="mk">Email</span><span style="font-family:var(--mono);font-size:12px">${c.email || '—'}</span></div>
+        <div class="client-meta"><span class="mk">Phone</span>${c.phone || '—'}</div>
+        <div class="client-meta"><span class="mk">Industry</span>${c.industry || '—'}</div>
+        <div class="client-stats">
+          <div><div class="client-stat-v" style="color:var(--accent)">${projCount}</div><div class="client-stat-l">Projects</div></div>
+          <div><div class="client-stat-v" style="color:var(--text);font-size:13px">${c.contract_date || '—'}</div><div class="client-stat-l">Contract</div></div>
+          <div><div class="client-stat-v" style="font-size:13px;color:var(--text)">${c.id}</div><div class="client-stat-l">ID</div></div>
+        </div>
+        <div class="card-actions" style="margin-top:12px">
+          <button class="btn btn-sm" onclick="openClientModal('${c.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}',event)">Delete</button>
         </div>
       </div>
     </div>
@@ -710,38 +842,21 @@ function renderAll() {
       `).join('')
     : emptyLead;
 
-  document.getElementById('clients-grid').innerHTML = clients.map(c => `
-    <div class="panel" style="margin-bottom: 16px;">
-      <div class="panel-header">
-        <div class="panel-title">${c.name}</div>
-        <a class="panel-link" onclick="openClient('${c.id}')">detail →</a>
-      </div>
-      <div style="padding: 20px 24px;">
-        <div style="margin-bottom: 14px;">
-          <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;">Contact</div>
-          <div style="font-size: 14px; color: var(--text);">${c.contact}</div>
-          <div style="font-family: var(--mono); font-size: 12px; color: var(--text-muted); margin-top: 2px;">${c.email}</div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 14px; border-top: 1px solid var(--border);">
-          <div>
-            <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Projects</div>
-            <div style="font-size: 18px; color: var(--accent); font-weight: 500;">${c.projects}</div>
-          </div>
-          <div>
-            <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Total spent</div>
-            <div style="font-size: 18px; color: var(--text); font-weight: 500;">฿${c.spent.toLocaleString()}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  const emptyClient = '<div class="empty-row" style="padding:32px;text-align:center;color:var(--text-dim);">No clients found — create one with "+ New client"</div>';
+  document.getElementById('clients-grid').innerHTML = clients.length
+    ? clients.map(renderClientCard).join('')
+    : emptyClient;
+
+  const sub = document.getElementById('clients-subtitle');
+  if (sub) sub.textContent = `${clients.length} clients · ${clients.filter(c => c.status === 'active').length} active`;
 
   updateNavCounts();
 }
 
 function updateNavCounts() {
   document.querySelector('[data-page="projects"] .nav-count').textContent = projects.length;
-  document.querySelector('[data-page="leads"] .nav-count').textContent = leads.length;
+  document.querySelector('[data-page="leads"] .nav-count').textContent    = leads.length;
+  document.querySelector('[data-page="clients"] .nav-count').textContent  = clients.length;
 }
 
 loadData();
@@ -807,34 +922,37 @@ function openLead(id) {
 function openClient(id) {
   const c = clients.find(x => x.id === id);
   if (!c) return;
-  document.getElementById('drawer-title').textContent = c.name;
-  document.getElementById('drawer-subtitle').textContent = `Client · ${id}`;
+  const clientProjects = projects.filter(p => p.client_id === id);
+  document.getElementById('drawer-title').textContent = c.company;
+  document.getElementById('drawer-subtitle').textContent = `${id} · ${c.industry || 'Client'}`;
   document.getElementById('drawer-body').innerHTML = `
     <div class="drawer-section">
       <div class="drawer-section-title">Contact Information</div>
       <div class="drawer-fields">
-        <div><div class="field-label">Name</div><div class="field-value">${c.contact}</div></div>
-        <div><div class="field-label">Email</div><div class="field-value mono">${c.email}</div></div>
-        <div><div class="field-label">Phone</div><div class="field-value mono">${c.phone}</div></div>
-        <div><div class="field-label">Status</div><div class="field-value">${c.status}</div></div>
+        <div><div class="field-label">Contact</div><div class="field-value">${c.contact || '—'}</div></div>
+        <div><div class="field-label">Status</div><div class="field-value"><span class="client-badge ${c.status === 'active' ? 'badge-active' : 'badge-inactive'}">${c.status}</span></div></div>
+        <div><div class="field-label">Email</div><div class="field-value mono">${c.email || '—'}</div></div>
+        <div><div class="field-label">Phone</div><div class="field-value mono">${c.phone || '—'}</div></div>
+        <div><div class="field-label">Industry</div><div class="field-value">${c.industry || '—'}</div></div>
+        <div><div class="field-label">Contract</div><div class="field-value mono">${c.contract_date || '—'}</div></div>
+        ${c.address ? `<div style="grid-column:1/-1"><div class="field-label">Address</div><div class="field-value">${c.address}</div></div>` : ''}
       </div>
     </div>
     <div class="drawer-section">
-      <div class="drawer-section-title">Business Summary</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
-        <div>
-          <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Total projects</div>
-          <div style="font-size: 24px; color: var(--accent); font-weight: 500;">${c.projects}</div>
+      <div class="drawer-section-title">Projects <span style="color:var(--accent)">(${clientProjects.length})</span></div>
+      ${clientProjects.length ? clientProjects.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:500">${p.name}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:2px">${p.id} · ${p.category}</div>
+          </div>
+          <span class="project-status ${({'delivered':'status-delivered','in progress':'status-progress','qc':'status-qc','draft':'status-draft'})[p.status.toLowerCase()]||'status-draft'}">${p.status}</span>
         </div>
-        <div>
-          <div style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Total spent</div>
-          <div style="font-size: 24px; color: var(--text); font-weight: 500;">฿${c.spent.toLocaleString()}</div>
-        </div>
-      </div>
+      `).join('') : '<div style="color:var(--text-dim);font-size:13px;padding:12px 0;">No projects yet</div>'}
     </div>
-    <div class="drawer-section">
-      <div class="drawer-section-title">Notes</div>
-      <div style="font-size: 14px; line-height: 1.6; color: var(--text);">${c.notes}</div>
+    <div class="drawer-section" style="display:flex;gap:10px">
+      <button class="btn" onclick="closeDrawer();openClientModal('${id}')">Edit client</button>
+      <button class="btn btn-danger" onclick="closeDrawer();deleteClient('${id}',event)">Delete client</button>
     </div>
   `;
   openDrawer();
@@ -878,8 +996,112 @@ function showToast(msg, type) {
 function showFilter(type) { showToast(`Filter for ${type} coming soon`, 'info'); }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeDrawer(); closeModal('proj'); closeModal('lead'); }
+  if (e.key === 'Escape') { closeDrawer(); closeModal('proj'); closeModal('lead'); closeModal('client'); }
 });
+
+/* ===== CLIENT CRUD ===== */
+let _editingClientId = null;
+
+function openClientModal(clientId = null) {
+  _editingClientId = clientId;
+  const today = new Date().toISOString().split('T')[0];
+  ['client_id','company_name','email'].forEach(f => {
+    document.getElementById(`fc-${f}`)?.classList.remove('error');
+    document.getElementById(`ec-${f}`)?.classList.remove('show');
+  });
+
+  if (clientId) {
+    const c = clients.find(x => x.id === clientId);
+    if (!c) return;
+    document.getElementById('client-modal-title').textContent = 'Edit Client';
+    document.getElementById('client-submit-label').textContent = 'Save Changes';
+    document.getElementById('fc-client_id').value    = c.id;
+    document.getElementById('fc-client_id').disabled = true;
+    document.getElementById('fc-company_name').value = c.company;
+    document.getElementById('fc-contact_name').value = c.contact;
+    document.getElementById('fc-email').value        = c.email;
+    document.getElementById('fc-phone').value        = c.phone;
+    document.getElementById('fc-industry').value     = c.industry;
+    document.getElementById('fc-status').value       = c.status;
+    document.getElementById('fc-contract_date').value= c.contract_date;
+    document.getElementById('fc-address').value      = c.address;
+  } else {
+    document.getElementById('client-modal-title').textContent = 'New Client';
+    document.getElementById('client-submit-label').textContent = 'Create Client';
+    document.getElementById('fc-client_id').disabled = false;
+    ['client_id','company_name','contact_name','email','phone','industry','address'].forEach(f =>
+      document.getElementById(`fc-${f}`).value = '');
+    document.getElementById('fc-status').value = 'active';
+    document.getElementById('fc-contract_date').value = today;
+  }
+  openModal('client');
+}
+
+async function submitClientForm() {
+  let valid = true;
+  ['client_id','company_name'].forEach(f => {
+    const el  = document.getElementById(`fc-${f}`);
+    const err = document.getElementById(`ec-${f}`);
+    if (!el.value.trim()) { el.classList.add('error'); err?.classList.add('show'); valid = false; }
+    else { el.classList.remove('error'); err?.classList.remove('show'); }
+  });
+  const emailEl  = document.getElementById('fc-email');
+  const emailErr = document.getElementById('ec-email');
+  if (emailEl.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value)) {
+    emailEl.classList.add('error'); emailErr.classList.add('show'); valid = false;
+  } else { emailEl.classList.remove('error'); emailErr.classList.remove('show'); }
+  if (!valid) return;
+
+  const btn   = document.getElementById('client-submit-btn');
+  const label = document.getElementById('client-submit-label');
+  btn.disabled = true;
+  label.textContent = _editingClientId ? 'Saving…' : 'Creating…';
+
+  const body = {
+    client_id:     document.getElementById('fc-client_id').value.trim(),
+    company_name:  document.getElementById('fc-company_name').value.trim(),
+    contact_name:  document.getElementById('fc-contact_name').value.trim(),
+    email:         document.getElementById('fc-email').value.trim(),
+    phone:         document.getElementById('fc-phone').value.trim(),
+    address:       document.getElementById('fc-address').value.trim(),
+    industry:      document.getElementById('fc-industry').value.trim(),
+    status:        document.getElementById('fc-status').value,
+    contract_date: document.getElementById('fc-contract_date').value,
+  };
+
+  try {
+    const url    = _editingClientId ? `${BASE_URL}/api/clients/${_editingClientId}` : `${BASE_URL}/api/clients`;
+    const method = _editingClientId ? 'PUT' : 'POST';
+    const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+    closeModal('client');
+    showToast(_editingClientId ? 'Client updated' : 'Client created', 'success');
+    await loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    label.textContent = _editingClientId ? 'Save Changes' : 'Create Client';
+  }
+}
+
+async function deleteClient(id, event) {
+  if (event) event.stopPropagation();
+  const projCount = projects.filter(p => p.client_id === id).length;
+  if (projCount > 0) {
+    showToast(`Cannot delete — ${projCount} project(s) reference this client`, 'error');
+    return;
+  }
+  if (!confirm(`Archive client ${id}? They will be hidden but kept in the sheet.`)) return;
+  try {
+    const res = await fetch(`${BASE_URL}/api/clients/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+    showToast(`Client ${id} archived`, 'success');
+    await loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
 
 /* ===== MODAL ===== */
 let _editingProjectId = null;
@@ -897,10 +1119,15 @@ function openProjectModal(projectId = null) {
   _editingProjectId = projectId;
   const today = new Date().toISOString().split('T')[0];
 
+  // Populate client dropdown
+  const clientSel = document.getElementById('f-client_id');
+  clientSel.innerHTML = '<option value="">— Select Client —</option>' +
+    clients.map(c => `<option value="${c.id}">${c.company} (${c.id})</option>`).join('');
+
   // Reset errors
-  ['project_id','client_name','video_type'].forEach(f => {
-    document.getElementById(`f-${f}`).classList.remove('error');
-    document.getElementById(`e-${f}`).classList.remove('show');
+  ['project_id','client_id','video_type'].forEach(f => {
+    document.getElementById(`f-${f}`)?.classList.remove('error');
+    document.getElementById(`e-${f}`)?.classList.remove('show');
   });
 
   if (projectId) {
@@ -910,7 +1137,7 @@ function openProjectModal(projectId = null) {
     document.getElementById('proj-submit-label').textContent = 'Save Changes';
     document.getElementById('f-project_id').value = p.id;
     document.getElementById('f-project_id').disabled = true;
-    document.getElementById('f-client_name').value = p.client;
+    clientSel.value = p.client_id || '';
     document.getElementById('f-status').value = p.status;
     document.getElementById('f-video_type').value = p.category;
     document.getElementById('f-created_date').value = '';
@@ -919,7 +1146,9 @@ function openProjectModal(projectId = null) {
     document.getElementById('proj-modal-title').textContent = 'New Project';
     document.getElementById('proj-submit-label').textContent = 'Create Project';
     document.getElementById('f-project_id').disabled = false;
-    ['project_id','client_name','video_type'].forEach(f => document.getElementById(`f-${f}`).value = '');
+    document.getElementById('f-project_id').value = '';
+    clientSel.value = '';
+    document.getElementById('f-video_type').value = '';
     document.getElementById('f-status').value = 'Draft';
     document.getElementById('f-created_date').value = today;
     document.getElementById('f-due_date').value = '';
@@ -943,11 +1172,11 @@ function openLeadModal() {
 
 async function submitProjectForm() {
   let valid = true;
-  ['project_id','client_name','video_type'].forEach(f => {
+  ['project_id','client_id','video_type'].forEach(f => {
     const el = document.getElementById(`f-${f}`);
     const err = document.getElementById(`e-${f}`);
-    if (!el.value.trim()) { el.classList.add('error'); err.classList.add('show'); valid = false; }
-    else { el.classList.remove('error'); err.classList.remove('show'); }
+    if (!el.value.trim()) { el.classList.add('error'); err?.classList.add('show'); valid = false; }
+    else { el.classList.remove('error'); err?.classList.remove('show'); }
   });
   if (!valid) return;
 
@@ -958,7 +1187,7 @@ async function submitProjectForm() {
 
   const body = {
     project_id:   document.getElementById('f-project_id').value.trim(),
-    client_name:  document.getElementById('f-client_name').value.trim(),
+    client_id:    document.getElementById('f-client_id').value,
     status:       document.getElementById('f-status').value,
     video_type:   document.getElementById('f-video_type').value.trim(),
     created_date: document.getElementById('f-created_date').value || new Date().toISOString().split('T')[0],
