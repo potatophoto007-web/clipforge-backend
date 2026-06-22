@@ -239,6 +239,29 @@
   ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+  /* ===== MODAL ===== */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 80; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+  .modal-backdrop.open { opacity: 1; pointer-events: auto; }
+  .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -48%); width: 520px; max-width: calc(100vw - 32px); max-height: 90vh; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 48px rgba(0,0,0,0.12); z-index: 81; overflow: hidden; opacity: 0; pointer-events: none; transition: all 0.2s ease; display: flex; flex-direction: column; }
+  .modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+  .modal-header { padding: 22px 26px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
+  .modal-title { font-family: var(--display); font-size: 22px; letter-spacing: -0.02em; color: var(--text); }
+  .modal-body { padding: 22px 26px; overflow-y: auto; flex: 1; }
+  .modal-footer { padding: 14px 26px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; }
+  .form-row { margin-bottom: 16px; }
+  .form-row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); margin-bottom: 5px; display: block; }
+  .form-input { width: 100%; padding: 9px 11px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg); color: var(--text); font-family: var(--body); font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,93,42,0.1); }
+  .form-input.error { border-color: var(--red); }
+  .form-err { font-size: 11px; color: var(--red); margin-top: 3px; display: none; }
+  .form-err.show { display: block; }
+  select.form-input { cursor: pointer; }
+  /* ===== CARD ACTIONS ===== */
+  .card-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); margin-top: 10px; }
+  .btn-danger { color: var(--red); border-color: rgba(199,62,62,0.25); }
+  .btn-danger:hover { background: rgba(199,62,62,0.06); border-color: rgba(199,62,62,0.4); }
+
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
     .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; z-index: 100; transform: translateX(-100%); transition: transform 0.3s ease; }
@@ -314,7 +337,7 @@
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.7 1 6.3 2.7"/><polyline points="21 3 21 9 15 9"/></svg>
             Sync
           </button>
-          <button class="btn btn-primary">
+          <button class="btn btn-primary" onclick="openProjectModal()">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New project
           </button>
@@ -361,7 +384,7 @@
         </div>
         <div class="topbar-actions">
           <button class="btn" onclick="showFilter('projects')">Filter</button>
-          <button class="btn btn-primary">+ New project</button>
+          <button class="btn btn-primary" onclick="openProjectModal()">+ New project</button>
         </div>
       </div>
       <div class="projects-grid" id="all-projects"></div>
@@ -375,7 +398,7 @@
         </div>
         <div class="topbar-actions">
           <button class="btn" onclick="showFilter('leads')">Filter</button>
-          <button class="btn btn-primary">+ Add lead</button>
+          <button class="btn btn-primary" onclick="openLeadModal()">+ Add lead</button>
         </div>
       </div>
       <div class="data-table">
@@ -415,6 +438,126 @@
     <div class="drawer-subtitle" id="drawer-subtitle">ID</div>
   </div>
   <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- ===== PROJECT MODAL ===== -->
+<div class="modal-backdrop" id="proj-modal-backdrop" onclick="closeModal('proj')"></div>
+<div class="modal" id="proj-modal">
+  <div class="modal-header">
+    <div class="modal-title" id="proj-modal-title">New Project</div>
+    <button class="drawer-close" onclick="closeModal('proj')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Project ID *</label>
+        <input class="form-input" id="f-project_id" placeholder="PRJ003">
+        <div class="form-err" id="e-project_id">Required</div>
+      </div>
+      <div>
+        <label class="form-label">Client Name *</label>
+        <input class="form-input" id="f-client_name" placeholder="Brand Co">
+        <div class="form-err" id="e-client_name">Required</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Status</label>
+        <select class="form-input" id="f-status">
+          <option value="Draft">Draft</option>
+          <option value="In Progress">In Progress</option>
+          <option value="QC">QC</option>
+          <option value="Delivered">Delivered</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Video Type *</label>
+        <input class="form-input" id="f-video_type" placeholder="30sec Ad">
+        <div class="form-err" id="e-video_type">Required</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Created Date</label>
+        <input class="form-input" type="date" id="f-created_date">
+      </div>
+      <div>
+        <label class="form-label">Due Date</label>
+        <input class="form-input" type="date" id="f-due_date">
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('proj')">Cancel</button>
+    <button class="btn btn-primary" id="proj-submit-btn" onclick="submitProjectForm()">
+      <span id="proj-submit-label">Create Project</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== LEAD MODAL ===== -->
+<div class="modal-backdrop" id="lead-modal-backdrop" onclick="closeModal('lead')"></div>
+<div class="modal" id="lead-modal">
+  <div class="modal-header">
+    <div class="modal-title" id="lead-modal-title">New Lead</div>
+    <button class="drawer-close" onclick="closeModal('lead')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Lead ID *</label>
+        <input class="form-input" id="fl-lead_id" placeholder="LD004">
+        <div class="form-err" id="el-lead_id">Required</div>
+      </div>
+      <div>
+        <label class="form-label">Company Name *</label>
+        <input class="form-input" id="fl-company_name" placeholder="Brand Co">
+        <div class="form-err" id="el-company_name">Required</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Contact Name</label>
+        <input class="form-input" id="fl-contact_name" placeholder="คุณสมชาย">
+      </div>
+      <div>
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="fl-email" placeholder="contact@brand.com">
+        <div class="form-err" id="el-email">Invalid email</div>
+      </div>
+    </div>
+    <div class="form-row two">
+      <div>
+        <label class="form-label">Source</label>
+        <select class="form-input" id="fl-source">
+          <option>Instagram</option><option>Facebook</option><option>TikTok</option>
+          <option>Email</option><option>Referral</option><option>Website</option><option>Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Status</label>
+        <select class="form-input" id="fl-status">
+          <option value="new">new</option><option value="contacted">contacted</option>
+          <option value="qualified">qualified</option><option value="proposal">proposal</option>
+          <option value="closed">closed</option><option value="lost">lost</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Created Date</label>
+      <input class="form-input" type="date" id="fl-created_date">
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('lead')">Cancel</button>
+    <button class="btn btn-primary" id="lead-submit-btn" onclick="submitLeadForm()">
+      <span id="lead-submit-label">Add Lead</span>
+    </button>
+  </div>
 </div>
 
 <!-- ===== TOAST ===== -->
@@ -508,7 +651,8 @@ function setLoading(on) {
 
 /* ===== RENDER ===== */
 function renderProjectCard(p) {
-  const statusClass = { delivered: 'status-delivered', progress: 'status-progress', qc: 'status-qc', draft: 'status-draft' }[p.status] || 'status-draft';
+  const statusMap = { delivered: 'status-delivered', 'in progress': 'status-progress', qc: 'status-qc', draft: 'status-draft' };
+  const statusClass = statusMap[p.status.toLowerCase()] || 'status-draft';
   return `
     <div class="project-card" onclick="openProject('${p.id}')">
       <div class="project-thumb">
@@ -526,6 +670,10 @@ function renderProjectCard(p) {
         <div class="project-footer">
           <span><span class="videos-count">${p.videos}</span> videos</span>
           <span><span class="credits">${p.credits}</span> credits</span>
+        </div>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-sm" onclick="openProjectModal('${p.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteProject('${p.id}',event)">Delete</button>
         </div>
       </div>
     </div>
@@ -730,8 +878,163 @@ function showToast(msg, type) {
 function showFilter(type) { showToast(`Filter for ${type} coming soon`, 'info'); }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeDrawer();
+  if (e.key === 'Escape') { closeDrawer(); closeModal('proj'); closeModal('lead'); }
 });
+
+/* ===== MODAL ===== */
+let _editingProjectId = null;
+
+function openModal(type) {
+  document.getElementById(`${type}-modal-backdrop`).classList.add('open');
+  document.getElementById(`${type}-modal`).classList.add('open');
+}
+function closeModal(type) {
+  document.getElementById(`${type}-modal-backdrop`).classList.remove('open');
+  document.getElementById(`${type}-modal`).classList.remove('open');
+}
+
+function openProjectModal(projectId = null) {
+  _editingProjectId = projectId;
+  const today = new Date().toISOString().split('T')[0];
+
+  // Reset errors
+  ['project_id','client_name','video_type'].forEach(f => {
+    document.getElementById(`f-${f}`).classList.remove('error');
+    document.getElementById(`e-${f}`).classList.remove('show');
+  });
+
+  if (projectId) {
+    const p = projects.find(x => x.id === projectId);
+    if (!p) return;
+    document.getElementById('proj-modal-title').textContent = 'Edit Project';
+    document.getElementById('proj-submit-label').textContent = 'Save Changes';
+    document.getElementById('f-project_id').value = p.id;
+    document.getElementById('f-project_id').disabled = true;
+    document.getElementById('f-client_name').value = p.client;
+    document.getElementById('f-status').value = p.status;
+    document.getElementById('f-video_type').value = p.category;
+    document.getElementById('f-created_date').value = '';
+    document.getElementById('f-due_date').value = '';
+  } else {
+    document.getElementById('proj-modal-title').textContent = 'New Project';
+    document.getElementById('proj-submit-label').textContent = 'Create Project';
+    document.getElementById('f-project_id').disabled = false;
+    ['project_id','client_name','video_type'].forEach(f => document.getElementById(`f-${f}`).value = '');
+    document.getElementById('f-status').value = 'Draft';
+    document.getElementById('f-created_date').value = today;
+    document.getElementById('f-due_date').value = '';
+  }
+  openModal('proj');
+}
+
+function openLeadModal() {
+  document.getElementById('lead-modal-title').textContent = 'New Lead';
+  document.getElementById('lead-submit-label').textContent = 'Add Lead';
+  ['lead_id','company_name','contact_name','email'].forEach(f => {
+    const el = document.getElementById(`fl-${f}`);
+    if (el) { el.value = ''; el.classList.remove('error'); }
+  });
+  ['lead_id','company_name','email'].forEach(f => document.getElementById(`el-${f}`)?.classList.remove('show'));
+  document.getElementById('fl-source').value = 'Instagram';
+  document.getElementById('fl-status').value = 'new';
+  document.getElementById('fl-created_date').value = new Date().toISOString().split('T')[0];
+  openModal('lead');
+}
+
+async function submitProjectForm() {
+  let valid = true;
+  ['project_id','client_name','video_type'].forEach(f => {
+    const el = document.getElementById(`f-${f}`);
+    const err = document.getElementById(`e-${f}`);
+    if (!el.value.trim()) { el.classList.add('error'); err.classList.add('show'); valid = false; }
+    else { el.classList.remove('error'); err.classList.remove('show'); }
+  });
+  if (!valid) return;
+
+  const btn = document.getElementById('proj-submit-btn');
+  const label = document.getElementById('proj-submit-label');
+  btn.disabled = true;
+  label.textContent = _editingProjectId ? 'Saving…' : 'Creating…';
+
+  const body = {
+    project_id:   document.getElementById('f-project_id').value.trim(),
+    client_name:  document.getElementById('f-client_name').value.trim(),
+    status:       document.getElementById('f-status').value,
+    video_type:   document.getElementById('f-video_type').value.trim(),
+    created_date: document.getElementById('f-created_date').value || new Date().toISOString().split('T')[0],
+    due_date:     document.getElementById('f-due_date').value,
+  };
+
+  try {
+    const url  = _editingProjectId ? `${BASE_URL}/api/projects/${_editingProjectId}` : `${BASE_URL}/api/projects`;
+    const method = _editingProjectId ? 'PUT' : 'POST';
+    const res  = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+    closeModal('proj');
+    showToast(_editingProjectId ? 'Project updated' : 'Project created', 'success');
+    await loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    label.textContent = _editingProjectId ? 'Save Changes' : 'Create Project';
+  }
+}
+
+async function submitLeadForm() {
+  let valid = true;
+  ['lead_id','company_name'].forEach(f => {
+    const el = document.getElementById(`fl-${f}`);
+    const err = document.getElementById(`el-${f}`);
+    if (!el.value.trim()) { el.classList.add('error'); err.classList.add('show'); valid = false; }
+    else { el.classList.remove('error'); err.classList.remove('show'); }
+  });
+  const emailEl  = document.getElementById('fl-email');
+  const emailErr = document.getElementById('el-email');
+  if (emailEl.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value)) {
+    emailEl.classList.add('error'); emailErr.classList.add('show'); valid = false;
+  } else { emailEl.classList.remove('error'); emailErr.classList.remove('show'); }
+  if (!valid) return;
+
+  const btn = document.getElementById('lead-submit-btn');
+  const label = document.getElementById('lead-submit-label');
+  btn.disabled = true; label.textContent = 'Adding…';
+
+  const body = {
+    lead_id:      document.getElementById('fl-lead_id').value.trim(),
+    company_name: document.getElementById('fl-company_name').value.trim(),
+    contact_name: document.getElementById('fl-contact_name').value.trim(),
+    email:        document.getElementById('fl-email').value.trim(),
+    source:       document.getElementById('fl-source').value,
+    status:       document.getElementById('fl-status').value,
+    created_date: document.getElementById('fl-created_date').value || new Date().toISOString().split('T')[0],
+  };
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/leads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+    closeModal('lead');
+    showToast('Lead added', 'success');
+    await loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; label.textContent = 'Add Lead';
+  }
+}
+
+async function deleteProject(id, event) {
+  event.stopPropagation();
+  if (!confirm(`Archive project ${id}?\nIt will be hidden from the list but kept in the sheet.`)) return;
+  try {
+    const res = await fetch(`${BASE_URL}/api/projects/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || `HTTP ${res.status}`); }
+    showToast(`Project ${id} archived`, 'success');
+    await loadData();
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  }
+}
 </script>
 </body>
 </html>

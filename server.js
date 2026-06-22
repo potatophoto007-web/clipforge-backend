@@ -31,7 +31,7 @@ function getAuth() {
 
   return new google.auth.GoogleAuth({
     credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 }
 
@@ -81,6 +81,26 @@ function rowsToObjects(values) {
         headers.map((h, i) => [h.trim().toLowerCase().replace(/\s+/g, '_'), row[i] ?? ''])
       )
     );
+}
+
+// ── Write helpers ────────────────────────────────────────────────────────────
+async function findRowById(tab, idValue) {
+  const { sheets } = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${tab}!A:A`,
+  });
+  const values = res.data.values || [];
+  const idx = values.findIndex((row, i) => i > 0 && row[0] === idValue);
+  return idx === -1 ? -1 : idx + 1; // 1-based sheet row
+}
+
+function validateRequired(body, fields) {
+  return fields.filter(f => !body[f] || !String(body[f]).trim());
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -144,13 +164,62 @@ app.get('/api/sheet-info', async (req, res) => {
 app.get('/api/projects', async (req, res) => {
   try {
     const values = await fetchSheet('ชีต1!A1:Z1000');
-    const data   = rowsToObjects(values);
-    console.log(`[projects] OK — ${data.length} rows, headers: ${values[0]?.join(', ')}`);
+    const data   = rowsToObjects(values).filter(p => p.status?.toLowerCase() !== 'archived');
+    console.log(`[projects GET] ${data.length} rows, headers: ${values[0]?.join(', ')}`);
     res.json(data);
   } catch (err) {
     const reason = classifySheetError(err);
-    console.error('[projects]', reason, '|', err.message);
+    console.error('[projects GET]', reason, '|', err.message);
     res.status(500).json({ error: reason, detail: err.message });
+  }
+});
+
+app.post('/api/projects', async (req, res) => {
+  const { project_id, client_name, status, video_type, created_date, due_date } = req.body || {};
+  const missing = validateRequired(req.body || {}, ['project_id', 'client_name', 'video_type']);
+  if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+
+  try {
+    const { sheets } = getSheetsClient();
+    const today = new Date().toISOString().split('T')[0];
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'ชีต1!A:F',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [[project_id.trim(), client_name.trim(), status || 'Draft', video_type.trim(), created_date || today, due_date || '']] },
+    });
+    console.log(`[projects POST] appended ${project_id}`);
+    res.json({ success: true, project_id, message: 'Project created' });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[projects POST]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+app.post('/api/leads', async (req, res) => {
+  const { lead_id, company_name, contact_name, email, source, status, created_date } = req.body || {};
+  const missing = validateRequired(req.body || {}, ['lead_id', 'company_name']);
+  if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+  if (email && !validateEmail(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  try {
+    const { sheets } = getSheetsClient();
+    const today = new Date().toISOString().split('T')[0];
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'Leads!A:G',
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [[lead_id.trim(), company_name.trim(), contact_name || '', email || '', source || '', status || 'new', created_date || today]] },
+    });
+    console.log(`[leads POST] appended ${lead_id}`);
+    res.json({ success: true, lead_id, message: 'Lead added' });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[leads POST]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
   }
 });
 
@@ -170,6 +239,64 @@ app.get('/api/leads', async (req, res) => {
     const reason = classifySheetError(err);
     console.error('[leads]', reason, '|', err.message);
     res.status(500).json({ error: reason, detail: err.message });
+  }
+});
+
+app.put('/api/projects/:project_id', async (req, res) => {
+  const { project_id } = req.params;
+  const { client_name, status, video_type, created_date, due_date } = req.body || {};
+  try {
+    const rowNum = await findRowById('ชีต1', project_id);
+    if (rowNum === -1) return res.status(404).json({ error: `Project ${project_id} not found` });
+
+    const { sheets } = getSheetsClient();
+    const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `ชีต1!A${rowNum}:F${rowNum}` });
+    const row = cur.data.values?.[0] || [];
+    const updated = [
+      project_id,
+      client_name?.trim()  ?? row[1] ?? '',
+      status               ?? row[2] ?? 'Draft',
+      video_type?.trim()   ?? row[3] ?? '',
+      created_date         ?? row[4] ?? '',
+      due_date             ?? row[5] ?? '',
+    ];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `ชีต1!A${rowNum}:F${rowNum}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [updated] },
+    });
+    console.log(`[projects PUT] updated row ${rowNum} for ${project_id}`);
+    res.json({ success: true, updated_fields: { client_name, status, video_type, created_date, due_date } });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[projects PUT]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
+  }
+});
+
+app.delete('/api/projects/:project_id', async (req, res) => {
+  const { project_id } = req.params;
+  try {
+    const rowNum = await findRowById('ชีต1', project_id);
+    if (rowNum === -1) return res.status(404).json({ error: `Project ${project_id} not found` });
+
+    const { sheets } = getSheetsClient();
+    const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `ชีต1!A${rowNum}:F${rowNum}` });
+    const row = (cur.data.values?.[0] || []).slice();
+    row[2] = 'Archived';
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `ชีต1!A${rowNum}:F${rowNum}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [row] },
+    });
+    console.log(`[projects DELETE] archived row ${rowNum} for ${project_id}`);
+    res.json({ success: true, deleted_project_id: project_id });
+  } catch (err) {
+    const reason = classifySheetError(err);
+    console.error('[projects DELETE]', reason, '|', err.message);
+    res.status(500).json({ error: reason });
   }
 });
 
