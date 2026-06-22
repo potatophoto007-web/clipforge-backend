@@ -306,17 +306,22 @@ app.delete('/api/projects/:project_id', async (req, res) => {
     if (rowNum === -1) return res.status(404).json({ error: `Project ${project_id} not found` });
 
     const { sheets } = getSheetsClient();
-    const cur = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `ชีต1!A${rowNum}:F${rowNum}` });
-    const row = (cur.data.values?.[0] || []).slice();
-    row[2] = 'Archived';
-    await sheets.spreadsheets.values.update({
+
+    // Read row first to capture client_id for response
+    const cur = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
       range: `ชีต1!A${rowNum}:F${rowNum}`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [row] },
     });
-    console.log(`[projects DELETE] archived row ${rowNum} for ${project_id}`);
-    res.json({ success: true, deleted_project_id: project_id });
+    const client_id = cur.data.values?.[0]?.[1] || '';
+
+    // Hard-clear the row — removes all cell values, row disappears from API responses
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `ชีต1!A${rowNum}:F${rowNum}`,
+    });
+
+    console.log(`[projects DELETE] cleared row ${rowNum} for ${project_id} (client: ${client_id})`);
+    res.json({ success: true, deleted_project_id: project_id, client_id });
   } catch (err) {
     const reason = classifySheetError(err);
     console.error('[projects DELETE]', reason, '|', err.message);
