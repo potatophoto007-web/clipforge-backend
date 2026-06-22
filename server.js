@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const { google } = require('googleapis');
 const cors = require('cors');
 const path = require('path');
@@ -109,6 +109,17 @@ function makeId(prefix) {
   return `${prefix}${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+// Normalize Thai (and all Unicode) text before writing to Sheets:
+// - NFC: consistent code points for Thai combining chars (vowels + tone marks)
+// - Strip C0/C1 control chars (except \t \n \r), zero-width Unicode chars
+function sanitizeText(str) {
+  if (str == null) return '';
+  return String(str)
+    .normalize('NFC')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
+    .replace(/[​‌‍‎‏﻿­]/g, '')
+    .trim();
+}
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   let credsStatus = '✗ MISSING';
@@ -457,18 +468,24 @@ app.post('/webhook/lead-intake', async (req, res) => {
     const isNewClient = !existing;
     const client_id = existing ? existing[0] : makeId('CW');
 
+    const sCompany = sanitizeText(company_name);
+    const sContact = sanitizeText(contact_name);
+    const sEmail   = sanitizeText(email);
+    const sPhone   = sanitizeText(phone);
+    const sSource  = sanitizeText(source) || 'webhook';
+
     if (isNewClient) {
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
         range: 'Clients!A:J',
-        valueInputOption: 'RAW',
+        valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [[
-          client_id, company_name.trim(), contact_name.trim(), email.trim(),
-          phone || '', '', '', 'active', '', today,
+          client_id, sCompany, sContact, sEmail,
+          sPhone, '', '', 'active', '', today,
         ]] },
       });
-      console.log(`[webhook] client created: ${client_id} (${company_name})`);
+      console.log(`[webhook] client created: ${client_id} (${sCompany})`);
     } else {
       console.log(`[webhook] client matched: ${client_id} (existing)`);
     }
@@ -477,24 +494,24 @@ app.post('/webhook/lead-intake', async (req, res) => {
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: 'Leads!A:G',
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [[
-        lead_id, company_name.trim(), contact_name.trim(), email.trim(),
-        source || 'webhook', 'new', today,
+        lead_id, sCompany, sContact, sEmail,
+        sSource, 'new', today,
       ]] },
     });
     console.log(`[webhook] lead created: ${lead_id}`);
 
     // 3. Auto-create project from lead
-    const videoType = brief ? brief.substring(0, 80) : 'TBD — from lead intake';
+    const videoType = brief ? sanitizeText(brief).substring(0, 80) : 'TBD — from lead intake';
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: 'ชีต1!A:F',
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [[
-        project_id, client_id, 'Draft', videoType, today, deadline || '',
+        project_id, client_id, 'Draft', videoType, today, sanitizeText(deadline) || '',
       ]] },
     });
     console.log(`[webhook] project created: ${project_id}`);
