@@ -1,11 +1,15 @@
 const express = require('express');
 const { google } = require('googleapis');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// ── Static files (serve HTML, CSS, JS) ──────────────────────────────────────
+app.use(express.static(path.join(__dirname)));
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
